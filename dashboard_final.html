@@ -1,11 +1,13 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Calidad COPC</title>
+    <title>Dashboard de Calidad COPC v2</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
     <style>
         :root {
             --primary-color: #003366;
@@ -15,6 +17,9 @@
             --text-color: #333;
             --card-bg: #ffffff;
             --shadow: 0 4px 8px rgba(0,0,0,0.1);
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -118,11 +123,27 @@
             margin: 0;
             font-weight: bold;
         }
-        .chart-card {
+        .chart-card, .analysis-card {
             background-color: var(--card-bg);
             padding: 20px;
             border-radius: 8px;
             box-shadow: var(--shadow);
+        }
+        .analysis-card h3 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+        .analysis-card ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .analysis-card ul li {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 5px solid var(--secondary-color);
         }
         .table-container {
             overflow-x: auto;
@@ -184,7 +205,7 @@
 
     <div class="container">
         <header>
-            <h1>Dashboard de Gestión de Calidad (COPC)</h1>
+            <h1>Dashboard de Gestión de Calidad (COPC) v2</h1>
         </header>
 
         <div class="filters">
@@ -198,21 +219,22 @@
             </div>
             <div>
                 <label for="skill-filter">Skill:</label>
-                <select id="skill-filter" multiple></select>
+                <select id="skill-filter" multiple size="3"></select>
             </div>
             <div>
                 <label for="supervisor-filter">Supervisor:</label>
-                <select id="supervisor-filter" multiple></select>
+                <select id="supervisor-filter" multiple size="3"></select>
             </div>
             <div>
                 <label for="longevidad-filter">Longevidad:</label>
-                <select id="longevidad-filter" multiple></select>
+                <select id="longevidad-filter" multiple size="3"></select>
             </div>
             <button id="apply-filters">Aplicar Filtros</button>
         </div>
 
         <div class="tabs">
             <button class="tab-button active" onclick="openTab(event, 'tab-ejecutivo')">Dashboard Ejecutivo</button>
+            <button class="tab-button" onclick="openTab(event, 'tab-diagnostico')">Diagnóstico y Plan de Acción</button>
             <button class="tab-button" onclick="openTab(event, 'tab-agentes')">Análisis de Agentes</button>
             <button class="tab-button" onclick="openTab(event, 'tab-otros')">Otros Análisis</button>
         </div>
@@ -245,11 +267,29 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Pestaña Diagnóstico y Plan de Acción -->
+        <div id="tab-diagnostico" class="tab-content">
+            <div class="grid-container">
+                <div class="analysis-card">
+                    <h3>Diagnóstico Ejecutivo</h3>
+                    <p id="diag-ejecutivo-text"></p>
+                </div>
+                <div class="analysis-card">
+                    <h3>Análisis y Recomendaciones COPC</h3>
+                    <p id="diag-copc-text"></p>
+                </div>
+                <div class="analysis-card" style="grid-column: 1 / -1;">
+                    <h3>Plan de Acción Inmediato</h3>
+                    <ul id="plan-accion-list"></ul>
+                </div>
+            </div>
+        </div>
 
         <!-- Pestaña Análisis de Agentes -->
         <div id="tab-agentes" class="tab-content">
             <div class="grid-container">
-                 <div class="chart-card">
+                 <div class="chart-card" style="grid-column: 1 / -1;">
                     <canvas id="cuadrante-agentes-chart"></canvas>
                 </div>
             </div>
@@ -335,8 +375,8 @@ function populateFilters() {
 
 function populateSelect(elementId, options) {
     const select = document.getElementById(elementId);
-    select.innerHTML = ''; // Limpiar opciones existentes
-    options.forEach(option => {
+    select.innerHTML = '';
+    options.sort().forEach(option => {
         const opt = document.createElement('option');
         opt.value = option;
         opt.textContent = option;
@@ -371,70 +411,81 @@ function getSelectedOptions(elementId) {
     return Array.from(document.getElementById(elementId).selectedOptions).map(opt => opt.value);
 }
 
-function recalculateAggregates(filteredData) {
-    // Recalcular KPIs
-    const total_auditorias = filteredData.length;
-    const nota_promedio = total_auditorias > 0 ? filteredData.reduce((sum, d) => sum + d.Nota, 0) / total_auditorias : 0;
-    const total_errores_criticos = filteredData.filter(d => d.Error_Critico === 'SI').length;
+function recalculateAggregates(data) {
+    const total_auditorias = data.length;
+    const nota_promedio = total_auditorias > 0 ? data.reduce((sum, d) => sum + d.Nota, 0) / total_auditorias : 0;
+    const total_errores_criticos = data.filter(d => d.Error_Critico === 'SI').length;
     const porc_errores_criticos = total_auditorias > 0 ? (total_errores_criticos / total_auditorias) * 100 : 0;
 
     const kpis = {
         total_auditorias,
-        nota_promedio: nota_promedio.toFixed(2),
-        porc_errores_criticos: porc_errores_criticos.toFixed(2)
+        nota_promedio: parseFloat(nota_promedio.toFixed(2)),
+        porc_errores_criticos: parseFloat(porc_errores_criticos.toFixed(2))
     };
 
-    // Agrupar datos para gráficos
     const groupBy = (data, key) => data.reduce((acc, item) => {
         (acc[item[key]] = acc[item[key]] || []).push(item);
         return acc;
     }, {});
 
-    const calculateGroupStats = (groupedData, nameKey) => {
-        return Object.entries(groupedData).map(([key, values]) => ({
-            [nameKey]: key,
-            Nota_Promedio: values.reduce((sum, v) => sum + v.Nota, 0) / values.length,
-            Auditorias: values.length,
-            Errores_Criticos: values.filter(v => v.Error_Critico === 'SI').length
-        }));
-    };
+    const calculateGroupStats = (groupedData, nameKey) => Object.entries(groupedData).map(([key, values]) => ({
+        [nameKey]: key,
+        Nota_Promedio: values.reduce((sum, v) => sum + v.Nota, 0) / values.length,
+        Auditorias: values.length,
+        Errores_Criticos: values.filter(v => v.Error_Critico === 'SI').length
+    }));
     
-    const df_clean_temp = filteredData.map(d => ({...d, Semana: new Date(d.Fecha).toISOString().slice(0,10)}));
-    const tendencia_semanal = calculateGroupStats(groupBy(df_clean_temp, 'Semana'), 'Semana');
+    const df_temp = data.map(d => ({...d, Semana: pd.to_datetime(d.Fecha).to_period('W').start_time.strftime('%Y-%m-%d')}));
+    const tendencia_semanal = calculateGroupStats(groupBy(df_temp, 'Semana'), 'Semana');
+
+    const all_causas = data.flatMap(d => d.Causas_Raiz);
+    const causas_raiz_freq = all_causas.reduce((acc, causa) => {
+        acc[causa] = (acc[causa] || 0) + 1;
+        return acc;
+    }, {});
 
     return {
         kpis,
         tendencia_semanal,
-        desempeno_skill: calculateGroupStats(groupBy(filteredData, 'Skill'), 'Skill'),
-        desempeno_agente: calculateGroupStats(groupBy(filteredData, 'Agente'), 'Agente'),
-        desempeno_supervisor: calculateGroupStats(groupBy(filteredData, 'Supervisor'), 'Supervisor'),
-        desempeno_longevidad: calculateGroupStats(groupBy(filteredData, 'Longevidad'), 'Longevidad'),
-        causas_raiz_freq: filteredData.flatMap(d => d.Causas_Raiz).reduce((acc, causa) => {
-            acc[causa] = (acc[causa] || 0) + 1;
-            return acc;
-        }, {}),
-        datos_crudos: filteredData
+        desempeno_skill: calculateGroupStats(groupBy(data, 'Skill'), 'Skill'),
+        desempeno_agente: calculateGroupStats(groupBy(data, 'Agente'), 'Agente'),
+        desempeno_supervisor: calculateGroupStats(groupBy(data, 'Supervisor'), 'Supervisor'),
+        desempeno_longevidad: calculateGroupStats(groupBy(data, 'Longevidad'), 'Longevidad'),
+        causas_raiz_freq,
+        agent_quadrant_metrics: {
+            avg_nota: nota_promedio,
+            avg_auditorias: total_auditorias > 0 ? total_auditorias / Object.keys(groupBy(data, 'Agente')).length : 0
+        },
+        datos_crudos: data
     };
 }
 
-
 function updateDashboard(data) {
-    // Actualizar KPIs
-    document.getElementById('kpi-nota-promedio').textContent = data.kpis.nota_promedio;
-    document.getElementById('kpi-total-auditorias').textContent = data.kpis.total_auditorias;
-    document.getElementById('kpi-error-critico').textContent = `${data.kpis.porc_errores_criticos}%`;
+    updateKPIs(data.kpis);
+    updateCharts(data);
+    updateAgentTable(data.desempeno_agente, data.datos_crudos);
+    updateDiagnostics(data);
+}
 
-    // Actualizar Gráficos
+function updateKPIs(kpis) {
+    document.getElementById('kpi-nota-promedio').textContent = kpis.nota_promedio.toFixed(2);
+    document.getElementById('kpi-total-auditorias').textContent = kpis.total_auditorias;
+    document.getElementById('kpi-error-critico').textContent = `${kpis.porc_errores_criticos.toFixed(2)}%`;
+}
+
+function updateCharts(data) {
+    // Tendencia Semanal
     createOrUpdateChart('tendencia-semanal-chart', 'line', {
-        labels: data.tendencia_semanal.map(d => d.Semana),
+        labels: data.tendencia_semanal.map(d => d.Semana).sort(),
         datasets: [{
             label: 'Nota Promedio Semanal',
-            data: data.tendencia_semanal.map(d => d.Nota_Promedio),
+            data: data.tendencia_semanal.sort((a,b) => new Date(a.Semana) - new Date(b.Semana)).map(d => d.Nota_Promedio),
             borderColor: 'rgba(0, 80, 158, 1)',
             tension: 0.1
         }]
     }, 'Tendencia de Calidad Semanal', data.datos_crudos, 'Semana');
 
+    // Desempeño por Skill
     createOrUpdateChart('desempeno-skill-chart', 'bar', {
         labels: data.desempeno_skill.map(d => d.Skill),
         datasets: [{
@@ -442,99 +493,69 @@ function updateDashboard(data) {
             data: data.desempeno_skill.map(d => d.Nota_Promedio),
             backgroundColor: 'rgba(0, 51, 102, 0.7)'
         }]
-    }, 'Desempeño por Skill', data.datos_crudos, 'Skill');
-    
+    }, 'Desempeño por Línea de Negocio (Skill)', data.datos_crudos, 'Skill');
+
+    // Pareto de Causas Raíz
     const causasData = Object.entries(data.causas_raiz_freq).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const totalCausas = causasData.reduce((sum, item) => sum + item[1], 0);
+    let cumulative = 0;
+    const cumulativePercentage = causasData.map(item => {
+        cumulative += item[1];
+        return (cumulative / totalCausas) * 100;
+    });
     createOrUpdateChart('causas-raiz-chart', 'bar', {
         labels: causasData.map(d => d[0]),
         datasets: [{
             label: 'Frecuencia',
             data: causasData.map(d => d[1]),
-            backgroundColor: 'rgba(255, 99, 132, 0.7)'
+            backgroundColor: 'rgba(255, 99, 132, 0.7)',
+            yAxisID: 'y'
+        }, {
+            label: '% Acumulado',
+            data: cumulativePercentage,
+            type: 'line',
+            borderColor: 'rgba(0, 51, 102, 1)',
+            backgroundColor: 'transparent',
+            yAxisID: 'y1'
         }]
-    }, 'Top 10 Causas Raíz de Fallas', data.datos_crudos, 'Causas_Raiz');
+    }, 'Análisis de Atributos de Falla (Pareto)', data.datos_crudos, 'Causas_Raiz', {
+        y: { type: 'linear', position: 'left', title: { display: true, text: 'Frecuencia' } },
+        y1: { type: 'linear', position: 'right', min: 0, max: 100, title: { display: true, text: '% Acumulado' }, grid: { drawOnChartArea: false } }
+    });
 
+    // Cuadrante de Agentes
+    const { avg_nota, avg_auditorias } = data.agent_quadrant_metrics;
     createOrUpdateChart('cuadrante-agentes-chart', 'scatter', {
         datasets: [{
             label: 'Agentes',
             data: data.desempeno_agente.map(agente => ({
                 x: agente.Auditorias,
                 y: agente.Nota_Promedio,
-                label: agente.Agente // Custom property
+                label: agente.Agente
             })),
             backgroundColor: 'rgba(0, 80, 158, 0.7)'
         }]
-    }, 'Cuadrante de Desempeño de Agentes (Volumen vs Calidad)', data.datos_crudos, 'Agente', {
+    }, 'Cuadrante de Desempeño de Agentes', data.datos_crudos, 'Agente', {
         x: { title: { display: true, text: 'Cantidad de Auditorías' } },
         y: { title: { display: true, text: 'Nota Promedio' } }
+    }, {
+        lineX: { type: 'line', xMin: avg_auditorias, xMax: avg_auditorias, borderColor: 'red', borderWidth: 2, label: { content: 'Prom. Auditorías', enabled: true } },
+        lineY: { type: 'line', yMin: avg_nota, yMax: avg_nota, borderColor: 'red', borderWidth: 2, label: { content: 'Prom. Nota', enabled: true } },
+        label1: { type: 'label', xValue: avg_auditorias * 1.5, yValue: avg_nota * 1.01, content: 'Top Performers', font: { size: 16 }, color: 'green' },
+        label2: { type: 'label', xValue: avg_auditorias * 0.5, yValue: avg_nota * 1.01, content: 'Potencial', font: { size: 16 }, color: 'blue' },
+        label3: { type: 'label', xValue: avg_auditorias * 0.5, yValue: avg_nota * 0.99, content: 'Coaching Urgente', font: { size: 16 }, color: 'orange' },
+        label4: { type: 'label', xValue: avg_auditorias * 1.5, yValue: avg_nota * 0.99, content: 'Veteranos con Oportunidad', font: { size: 16 }, color: 'purple' }
     });
 
+    // Otros Análisis
     createOrUpdateChart('desempeno-longevidad-chart', 'bar', {
         labels: data.desempeno_longevidad.map(d => d.Longevidad),
-        datasets: [{
-            label: 'Nota Promedio',
-            data: data.desempeno_longevidad.map(d => d.Nota_Promedio),
-            backgroundColor: 'rgba(0, 80, 158, 0.7)'
-        }]
+        datasets: [{ label: 'Nota Promedio', data: data.desempeno_longevidad.map(d => d.Nota_Promedio), backgroundColor: 'rgba(0, 80, 158, 0.7)' }]
     }, 'Desempeño por Longevidad', data.datos_crudos, 'Longevidad');
-
     createOrUpdateChart('desempeno-supervisor-chart', 'bar', {
         labels: data.desempeno_supervisor.map(d => d.Supervisor),
-        datasets: [{
-            label: 'Nota Promedio',
-            data: data.desempeno_supervisor.map(d => d.Nota_Promedio),
-            backgroundColor: 'rgba(0, 51, 102, 0.7)'
-        }]
+        datasets: [{ label: 'Nota Promedio', data: data.desempeno_supervisor.map(d => d.Nota_Promedio), backgroundColor: 'rgba(0, 51, 102, 0.7)' }]
     }, 'Desempeño por Supervisor', data.datos_crudos, 'Supervisor');
-
-    // Actualizar Tabla de Agentes
-    updateAgentTable(data.desempeno_agente, data.datos_crudos);
-}
-
-function createOrUpdateChart(canvasId, type, data, title, rawData, filterKey, customScales = {}) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    if (charts[canvasId]) {
-        charts[canvasId].destroy();
-    }
-    charts[canvasId] = new Chart(ctx, {
-        type: type,
-        data: data,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                title: {
-                    display: true,
-                    text: title,
-                    font: { size: 18 }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            if (type === 'scatter') {
-                                return context.raw.label;
-                            }
-                            return context.dataset.label + ': ' + context.formattedValue;
-                        }
-                    }
-                }
-            },
-            onClick: (event, elements) => {
-                if (elements.length > 0) {
-                    const elementIndex = elements[0].index;
-                    const clickedLabel = data.labels[elementIndex];
-                    const filtered = rawData.filter(d => {
-                        if (Array.isArray(d[filterKey])) {
-                            return d[filterKey].includes(clickedLabel);
-                        }
-                        return d[filterKey] == clickedLabel
-                    });
-                    showModalWithData(clickedLabel, filtered);
-                }
-            },
-            scales: customScales
-        }
-    });
 }
 
 function updateAgentTable(agentes, rawData) {
@@ -559,10 +580,71 @@ function updateAgentTable(agentes, rawData) {
     });
 }
 
+function updateDiagnostics(data) {
+    const { kpis, desempeno_skill, causas_raiz_freq } = data;
+    const top_skill = desempeno_skill.reduce((max, s) => s.Nota_Promedio > max.Nota_Promedio ? s : max, {Nota_Promedio: 0});
+    const bottom_skill = desempeno_skill.reduce((min, s) => s.Nota_Promedio < min.Nota_Promedio ? s : min, {Nota_Promedio: 101});
+    const top_causa = Object.entries(causas_raiz_freq).sort((a, b) => b[1] - a[1])[0] || ['N/A', 0];
+
+    // Diagnóstico Ejecutivo
+    document.getElementById('diag-ejecutivo-text').innerText = `
+        En el período analizado, se realizaron ${kpis.total_auditorias} auditorías, obteniendo una nota promedio de ${kpis.nota_promedio.toFixed(2)}. 
+        El porcentaje de errores críticos es del ${kpis.porc_errores_criticos.toFixed(2)}%, un indicador clave de riesgo en la operación.
+        La línea de negocio con mejor desempeño es '${top_skill.Skill}' (${top_skill.Nota_Promedio.toFixed(2)}), mientras que '${bottom_skill.Skill}' (${bottom_skill.Nota_Promedio.toFixed(2)}) presenta la mayor área de oportunidad.
+        La principal causa de falla detectada es '${top_causa[0]}', con ${top_causa[1]} incidencias.
+    `;
+
+    // Análisis COPC
+    document.getElementById('diag-copc-text').innerText = `
+        Desde la perspectiva COPC, la variabilidad en el desempeño entre skills ('${top_skill.Skill}' vs '${bottom_skill.Skill}') sugiere una inconsistencia en la ejecución de procesos o en la efectividad del coaching.
+        El ${kpis.porc_errores_criticos.toFixed(2)}% de Errores Críticos Fatales (FCEs) impacta directamente la satisfacción del cliente y la eficiencia del negocio. Es imperativo analizar la causa raíz de estos FCEs.
+        Se recomienda un análisis profundo (drill-down) en los agentes y supervisores del skill '${bottom_skill.Skill}' para identificar las causas específicas de la baja performance.
+    `;
+
+    // Plan de Acción
+    const planList = document.getElementById('plan-accion-list');
+    planList.innerHTML = `
+        <li><strong>Acción Inmediata:</strong> Iniciar sesiones de calibración con todos los auditores enfocadas en el atributo '${top_causa[0]}' para asegurar consistencia en la evaluación.</li>
+        <li><strong>Coaching de Emergencia:</strong> Implementar sesiones de coaching 1-a-1 con los 5 agentes con la nota más baja dentro del skill '${bottom_skill.Skill}'.</li>
+        <li><strong>Revisión de Procesos:</strong> Formar un grupo de trabajo con supervisores de '${bottom_skill.Skill}' para revisar y reforzar el proceso o conocimiento asociado a '${top_causa[0]}'.</li>
+        <li><strong>Reconocimiento:</strong> Reconocer públicamente a los 'Top Performers' del cuadrante de desempeño para motivar y compartir mejores prácticas.</li>
+    `;
+}
+
+
+function createOrUpdateChart(canvasId, type, data, title, rawData, filterKey, customScales = {}, annotations = {}) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (charts[canvasId]) {
+        charts[canvasId].destroy();
+    }
+    charts[canvasId] = new Chart(ctx, {
+        type: type,
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: title, font: { size: 18 } },
+                tooltip: { callbacks: { label: (context) => type === 'scatter' ? context.raw.label : `${context.dataset.label}: ${context.formattedValue}` } },
+                annotation: { annotations }
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const chart = elements[0].chart;
+                    const elementIndex = elements[0].index;
+                    const clickedLabel = chart.data.labels[elementIndex];
+                    const filtered = rawData.filter(d => Array.isArray(d[filterKey]) ? d[filterKey].includes(clickedLabel) : d[filterKey] == clickedLabel);
+                    showModalWithData(clickedLabel, filtered);
+                }
+            },
+            scales: customScales
+        }
+    });
+}
+
 function showModalWithData(title, data) {
     const modal = document.getElementById('drill-modal');
     document.getElementById('modal-title').textContent = title;
-    
     const tableHead = modal.querySelector('thead');
     const tableBody = modal.querySelector('tbody');
     tableHead.innerHTML = '';
@@ -571,30 +653,22 @@ function showModalWithData(title, data) {
     if (data.length > 0) {
         const headers = Object.keys(data[0]);
         const headerRow = document.createElement('tr');
-        headers.forEach(header => {
-            const th = document.createElement('th');
-            th.textContent = header;
-            headerRow.appendChild(th);
-        });
+        headers.forEach(h => { const th = document.createElement('th'); th.textContent = h; headerRow.appendChild(th); });
         tableHead.appendChild(headerRow);
 
         data.forEach(item => {
             const row = document.createElement('tr');
-            headers.forEach(header => {
+            headers.forEach(h => {
                 const td = document.createElement('td');
-                let value = item[header];
-                if (Array.isArray(value)) {
-                    value = value.join(', ');
-                } else if (typeof value === 'number') {
-                    value = value.toFixed(2);
-                }
-                td.textContent = value;
+                let val = item[h];
+                if (Array.isArray(val)) val = val.join(', ');
+                else if (typeof val === 'number') val = val.toFixed(2);
+                td.textContent = val;
                 row.appendChild(td);
             });
             tableBody.appendChild(row);
         });
     }
-
     modal.style.display = 'block';
 }
 
@@ -603,19 +677,11 @@ function closeModal() {
 }
 
 function openTab(evt, tabName) {
-    let i, tabcontent, tablinks;
-    tabcontent = document.getElementsByClassName("tab-content");
-    for (i = 0; i < tabcontent.length; i++) {
-        tabcontent[i].style.display = "none";
-    }
-    tablinks = document.getElementsByClassName("tab-button");
-    for (i = 0; i < tablinks.length; i++) {
-        tablinks[i].className = tablinks[i].className.replace(" active", "");
-    }
+    document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = "none");
+    document.querySelectorAll('.tab-button').forEach(tb => tb.classList.remove('active'));
     document.getElementById(tabName).style.display = "block";
-    evt.currentTarget.className += " active";
+    evt.currentTarget.classList.add('active');
 }
-
 </script>
 
 </body>
