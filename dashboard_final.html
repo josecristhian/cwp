@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Definitivo de Calidad COPC</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f8f9fa; margin: 0; padding: 20px; }
+        .container { max-width: 1600px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-top: 40px; }
+        h1 { text-align: center; margin-bottom: 40px; border: none; }
+        .filters { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; background-color: #f1f1f1; padding: 15px; border-radius: 8px; }
+        .filters select, .filters input, .filters button { padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
+        .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; cursor: pointer; background: #f1f1f1; border: 1px solid #ddd; border-bottom: none; margin-right: 5px; border-radius: 5px 5px 0 0; font-weight: bold; }
+        .tab.active { background: #fff; border-bottom: 1px solid #fff; color: #3498db; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 25px; margin-top: 25px; }
+        .card { background: #ffffff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); border: 1px solid #e1e8ed; }
+        .kpi-card { text-align: center; padding: 30px; }
+        .kpi-card .metric { font-size: 2.8em; font-weight: bold; }
+        .kpi-card .metric.good { color: #2ecc71; }
+        .kpi-card .metric.warning { color: #f39c12; }
+        .chart-container { position: relative; width: 100%; height: 450px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #34495e; color: white; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 60%; border-radius: 8px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dashboard de Gestión de Rendimiento de Calidad (COPC)</h1>
+        <div class="filters">
+            <label>Desde:</label><input type="date" id="startDate">
+            <label>Hasta:</label><input type="date" id="endDate">
+            <select id="skillFilter"><option value="">Todos los Skills</option></select>
+            <select id="supervisorFilter"><option value="">Todos los Supervisores</option></select>
+            <select id="longevityFilter"><option value="">Toda Longevidad</option></select>
+            <button onclick="applyFilters()">Aplicar Filtros</button>
+        </div>
+        <div class="tabs">
+            <div class="tab active" onclick="openTab(event, 'dashboard')">Dashboard Ejecutivo</div>
+            <div class="tab" onclick="openTab(event, 'agentes')">Análisis de Agentes</div>
+            <div class="tab" onclick="openTab(event, 'otros')">Otros Análisis</div>
+        </div>
+
+        <div id="dashboard" class="tab-content active">
+            <div class="grid">
+                <div class="card kpi-card"><div class="metric good" id="notaCalidad"></div><div class="label">Nota Promedio</div></div>
+                <div class="card kpi-card"><div class="metric warning" id="tasaErrorCritico"></div><div class="label">Tasa Error Crítico</div></div>
+                <div class="card kpi-card"><div class="metric" id="totalAuditorias"></div><div class="label">Auditorías</div></div>
+            </div>
+            <div class="grid">
+                <div class="card"><h3>Tendencia Semanal</h3><div class="chart-container"><canvas id="trendChart"></canvas></div></div>
+                <div class="card"><h3>Desempeño por Skill</h3><div class="chart-container"><canvas id="skillBubbleChart"></canvas></div></div>
+            </div>
+        </div>
+
+        <div id="agentes" class="tab-content">
+            <div class="grid">
+                <div class="card"><h3>Cuadrante de Desempeño de Agentes</h3><div class="chart-container"><canvas id="agentQuadrantChart"></canvas></div></div>
+                <div class="card">
+                    <h3 id="agentListTitle">Ranking de Agentes</h3>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table id="agentTable"><thead><tr><th>Agente</th><th>Supervisor</th><th>Auditorías</th><th>Nota Promedio</th></tr></thead><tbody></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="otros" class="tab-content">
+             <div class="grid">
+                <div class="card"><h3>Desempeño por Longevidad</h3><div class="chart-container"><canvas id="longevityChart"></canvas></div></div>
+                <div class="card"><h3>Desempeño por Supervisor</h3><div class="chart-container"><canvas id="supervisorChart"></canvas></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="modal"><div class="modal-content"><span class="close" onclick="closeModal()">&times;</span><h2 id="modalTitle"></h2><div id="modalContent" style="max-height: 400px; overflow-y: auto;"></div></div></div>
+
+    <script>
+        let fullData = {};
+        let charts = {};
+        let currentFilteredData = [];
+
+        // --- MAIN INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('data.json')
+                .then(response => response.json())
+                .then(data => {
+                    fullData = data;
+                    // Convert date strings to Date objects for filtering
+                    fullData.raw_data.forEach(d => d.Fecha = new Date(d.Fecha));
+                    populateFilters();
+                    applyFilters(); // Initial load
+                })
+                .catch(error => {
+                    console.error("Error loading data.json:", error);
+                    alert("No se pudo cargar el archivo de datos 'data.json'. Asegúrese de que el archivo existe en el mismo directorio.");
+                });
+        });
+
+        function openTab(evt, tabName) {
+            document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabName).style.display = 'block';
+            evt.currentTarget.classList.add('active');
+        }
+
+        function applyFilters() {
+            const startDate = document.getElementById('startDate').valueAsDate;
+            const endDate = document.getElementById('endDate').valueAsDate;
+            const skill = document.getElementById('skillFilter').value;
+            const supervisor = document.getElementById('supervisorFilter').value;
+            const longevity = document.getElementById('longevityFilter').value;
+
+            currentFilteredData = fullData.raw_data.filter(d => {
+                if (startDate && d.Fecha < startDate) return false;
+                if (endDate && d.Fecha > endDate) return false;
+                if (skill && d.Skill !== skill) return false;
+                if (supervisor && d.Supervisor !== supervisor) return false;
+                if (longevity && d.Longevidad !== longevity) return false;
+                return true;
+            });
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            const data = currentFilteredData;
+            const totalAuditorias = data.length;
+            const notaPromedio = data.reduce((sum, d) => sum + d.Nota, 0) / totalAuditorias || 0;
+            const criticalErrors = data.filter(d => d.Error_Critico === 'SI').length;
+            const tasaErrorCritico = (criticalErrors / totalAuditorias) * 100 || 0;
+
+            document.getElementById('notaCalidad').innerText = notaPromedio.toFixed(2);
+            document.getElementById('tasaErrorCritico').innerText = tasaErrorCritico.toFixed(2) + '%';
+            document.getElementById('totalAuditorias').innerText = totalAuditorias;
+
+            Object.values(charts).forEach(chart => chart.destroy());
+            renderAllCharts(data);
+        }
+
+        function renderAllCharts(data) {
+            renderTrendChart(data);
+            renderSkillBubbleChart(data);
+            renderAgentQuadrant(data);
+            renderLongevityChart(data);
+            renderSupervisorChart(data);
+        }
+        
+        function renderTrendChart(data) {
+            const trendData = data.reduce((acc, d) => {
+                const week = d.Semana;
+                if (!acc[week]) acc[week] = { notas: [], errors: 0, count: 0 };
+                acc[week].notas.push(d.Nota);
+                if (d.Error_Critico === 'SI') acc[week].errors++;
+                acc[week].count++;
+                return acc;
+            }, {});
+
+            const labels = Object.keys(trendData).sort();
+            const avgScores = labels.map(w => trendData[w].notas.reduce((s, n) => s + n, 0) / trendData[w].count);
+            const errorRates = labels.map(w => (trendData[w].errors / trendData[w].count) * 100);
+
+            charts.trend = new Chart('trendChart', {
+                type: 'line',
+                data: { labels, datasets: [ { label: 'Nota Promedio', data: avgScores, yAxisID: 'y', borderColor: '#3498db' }, { label: 'Tasa Error Crítico (%)', data: errorRates, yAxisID: 'y1', borderColor: '#e74c3c' } ] },
+                options: { maintainAspectRatio: false, scales: { y: { beginAtZero: false, title: { display: true, text: 'Nota Promedio' } }, y1: { type: 'linear', position: 'right', title: { display: true, text: 'Tasa Error Crítico (%)' }, grid: { drawOnChartArea: false } } } }
+            });
+        }
+
+        function renderSkillBubbleChart(data) {
+            const skillData = [...new Set(data.map(d => d.Skill))].map(skill => {
+                const skillAudits = data.filter(d => d.Skill === skill);
+                const notaPromedio = skillAudits.reduce((sum, d) => sum + d.Nota, 0) / skillAudits.length;
+                const tasaErrorCritico = (skillAudits.filter(d => d.Error_Critico === 'SI').length / skillAudits.length) * 100;
+                return { label: skill, x: notaPromedio, y: tasaErrorCritico, r: Math.sqrt(skillAudits.length) * 2 };
+            });
+
+            charts.skillBubble = new Chart('skillBubbleChart', {
+                type: 'bubble',
+                data: { datasets: [{ label: 'Skills', data: skillData, backgroundColor: '#3498db80' }] },
+                options: { maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Nota Promedio' } }, y: { title: { display: true, text: 'Tasa Error Crítico (%)' } } } }
+            });
+        }
+
+        function renderAgentQuadrant(data) {
+            const agentData = calculateAgentPerformance(data);
+            charts.agentQuadrant = new Chart('agentQuadrantChart', {
+                type: 'scatter',
+                data: { datasets: [{ label: 'Agentes', data: agentData.map(a => ({ x: a.auditorias, y: a.nota_promedio })), backgroundColor: 'rgba(52, 152, 219, 0.7)' }] },
+                options: { maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Número de Auditorías' } }, y: { title: { display: true, text: 'Nota Promedio' } } } }
+            });
+            populateAgentTable(agentData);
+        }
+        
+        function renderLongevityChart(data) {
+            const longevityData = [...new Set(data.map(d => d.Longevidad))].map(l => {
+                const audits = data.filter(d => d.Longevidad === l);
+                return {
+                    longevidad: l,
+                    nota_promedio: audits.reduce((sum, d) => sum + d.Nota, 0) / audits.length,
+                    tasa_error_critico: (audits.filter(d => d.Error_Critico === 'SI').length / audits.length) * 100
+                };
+            });
+            charts.longevity = new Chart('longevityChart', {
+                type: 'bar',
+                data: { labels: longevityData.map(l => l.longevidad), datasets: [{ label: 'Nota Promedio', data: longevityData.map(l => l.nota_promedio) }] },
+                options: { maintainAspectRatio: false }
+            });
+        }
+
+        function renderSupervisorChart(data) {
+            const supervisorData = [...new Set(data.map(d => d.Supervisor))].map(s => {
+                const audits = data.filter(d => d.Supervisor === s);
+                return { supervisor: s, nota_promedio: audits.reduce((sum, d) => sum + d.Nota, 0) / audits.length };
+            }).sort((a,b) => b.nota_promedio - a.nota_promedio);
+
+            charts.supervisor = new Chart('supervisorChart', {
+                type: 'bar',
+                data: { labels: supervisorData.map(s => s.supervisor), datasets: [{ label: 'Nota Promedio', data: supervisorData.map(s => s.nota_promedio) }] },
+                options: { maintainAspectRatio: false, indexAxis: 'y' }
+            });
+        }
+
+        function calculateAgentPerformance(data) {
+             const agentGroups = data.reduce((acc, d) => {
+                if (!acc[d.Agente]) acc[d.Agente] = { notas: [], audits: 0, supervisor: d.Supervisor };
+                acc[d.Agente].notas.push(d.Nota);
+                acc[d.Agente].audits++;
+                return acc;
+            }, {});
+            return Object.keys(agentGroups).map(agentName => {
+                const group = agentGroups[agentName];
+                const notaPromedio = group.notas.reduce((s, n) => s + n, 0) / group.audits;
+                return { Agente: agentName, nota_promedio: notaPromedio, auditorias: group.audits, Supervisor: group.supervisor };
+            });
+        }
+
+        function populateAgentTable(agents) {
+            const tableBody = document.getElementById('agentTable').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '';
+            agents.sort((a, b) => a.nota_promedio - b.nota_promedio).forEach(agent => {
+                let row = tableBody.insertRow();
+                row.innerHTML = `<td>${agent.Agente}</td><td>${agent.Supervisor}</td><td>${agent.auditorias}</td><td>${agent.nota_promedio.toFixed(2)}</td>`;
+                row.ondblclick = () => showDetailModal('Agente: ' + agent.Agente, `Nota Promedio: ${agent.nota_promedio.toFixed(2)}<br>Auditorías: ${agent.auditorias}`);
+            });
+        }
+        
+        function showDetailModal(title, content) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalContent').innerHTML = content;
+            document.getElementById('detailModal').style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        function populateFilters() {
+            const skills = [...new Set(fullData.raw_data.map(d => d.Skill))].sort();
+            const supervisors = [...new Set(fullData.raw_data.map(d => d.Supervisor))].sort();
+            const longevities = [...new Set(fullData.raw_data.map(d => d.Longevidad))].sort();
+            
+            const skillFilter = document.getElementById('skillFilter');
+            skills.forEach(s => skillFilter.innerHTML += `<option value="${s}">${s}</option>`);
+
+            const supervisorFilter = document.getElementById('supervisorFilter');
+            supervisors.forEach(s => supervisorFilter.innerHTML += `<option value="${s}">${s}</option>`);
+            
+            const longevityFilter = document.getElementById('longevityFilter');
+            longevities.forEach(l => longevityFilter.innerHTML += `<option value="${l}">${l}</option>`);
+        }
+    </script>
+</body>
+</html>
