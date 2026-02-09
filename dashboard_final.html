@@ -1,602 +1,622 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Calidad COPC</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
+        :root {
+            --primary-color: #003366;
+            --secondary-color: #00509E;
+            --accent-color: #FFD700;
+            --background-color: #f4f7fa;
+            --text-color: #333;
+            --card-bg: #ffffff;
+            --shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
         body {
-            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
         }
-        .kpi-card {
-            border-left: 5px solid;
-            padding: 1.5rem;
+        .container {
+            max-width: 1600px;
+            margin: auto;
         }
-        .kpi-card.border-primary { border-color: #0d6efd; }
-        .kpi-card.border-success { border-color: #198754; }
-        .kpi-card.border-danger { border-color: #dc3545; }
-        .kpi-value {
-            font-size: 2.5rem;
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .filters {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filters > div {
+            display: flex;
+            flex-direction: column;
+        }
+        .filters label {
+            margin-bottom: 5px;
             font-weight: bold;
         }
-        .kpi-label {
-            font-size: 1rem;
-            color: #6c757d;
+        .filters input, .filters select, .filters button {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
         }
-        .chart-container {
-            background-color: #ffffff;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075);
-            height: 450px;
+        .filters button {
+            background-color: var(--secondary-color);
+            color: white;
+            cursor: pointer;
+            border: none;
+            align-self: flex-end;
         }
-        .table-responsive {
-            max-height: 600px;
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--primary-color);
+            margin-bottom: 20px;
         }
-        .nav-tabs .nav-link {
-            color: #495057;
+        .tab-button {
+            padding: 15px 25px;
+            cursor: pointer;
+            border: none;
+            background-color: transparent;
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--secondary-color);
         }
-        .nav-tabs .nav-link.active {
-            color: #000;
-            background-color: #fff;
-            border-color: #dee2e6 #dee2e6 #fff;
+        .tab-button.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 8px 8px 0 0;
         }
-        #agent-quadrant .apexcharts-tooltip {
-            color: #000;
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .grid-container {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        }
+        .kpi-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .kpi-card {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+        .kpi-card h3 {
+            margin: 0 0 10px 0;
+            color: var(--secondary-color);
+        }
+        .kpi-card p {
+            font-size: 2.5em;
+            margin: 0;
+            font-weight: bold;
+        }
+        .chart-card {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+        .table-container {
+            overflow-x: auto;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            grid-column: 1 / -1;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 1200px;
+            border-radius: 8px;
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            position: absolute;
+            top: 10px;
+            right: 25px;
+            font-size: 35px;
+            font-weight: bold;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid mt-4">
-        <h1 class="mb-4">Dashboard de Gestión de Calidad</h1>
 
-        <!-- FILTROS -->
-        <div class="card mb-4">
-            <div class="card-header">
-                Filtros Globales
+    <div class="container">
+        <header>
+            <h1>Dashboard de Gestión de Calidad (COPC)</h1>
+        </header>
+
+        <div class="filters">
+            <div>
+                <label for="fecha-desde">Fecha Desde:</label>
+                <input type="date" id="fecha-desde">
             </div>
-            <div class="card-body">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-2">
-                        <label for="fechaDesde" class="form-label">Fecha Desde</label>
-                        <input type="date" class="form-control" id="fechaDesde">
-                    </div>
-                    <div class="col-md-2">
-                        <label for="fechaHasta" class="form-label">Fecha Hasta</label>
-                        <input type="date" class="form-control" id="fechaHasta">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="skillFilter" class="form-label">Skill</label>
-                        <select id="skillFilter" class="form-select"></select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="supervisorFilter" class="form-label">Supervisor</label>
-                        <select id="supervisorFilter" class="form-select"></select>
-                    </div>
-                    <div class="col-md-2">
-                        <button id="applyFilters" class="btn btn-primary w-100">Aplicar Filtros</button>
-                    </div>
+            <div>
+                <label for="fecha-hasta">Fecha Hasta:</label>
+                <input type="date" id="fecha-hasta">
+            </div>
+            <div>
+                <label for="skill-filter">Skill:</label>
+                <select id="skill-filter" multiple></select>
+            </div>
+            <div>
+                <label for="supervisor-filter">Supervisor:</label>
+                <select id="supervisor-filter" multiple></select>
+            </div>
+            <div>
+                <label for="longevidad-filter">Longevidad:</label>
+                <select id="longevidad-filter" multiple></select>
+            </div>
+            <button id="apply-filters">Aplicar Filtros</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="openTab(event, 'tab-ejecutivo')">Dashboard Ejecutivo</button>
+            <button class="tab-button" onclick="openTab(event, 'tab-agentes')">Análisis de Agentes</button>
+            <button class="tab-button" onclick="openTab(event, 'tab-otros')">Otros Análisis</button>
+        </div>
+
+        <!-- Pestaña Dashboard Ejecutivo -->
+        <div id="tab-ejecutivo" class="tab-content active">
+            <div class="kpi-container">
+                <div class="kpi-card">
+                    <h3>Nota Promedio</h3>
+                    <p id="kpi-nota-promedio">0</p>
+                </div>
+                <div class="kpi-card">
+                    <h3>Total Auditorías</h3>
+                    <p id="kpi-total-auditorias">0</p>
+                </div>
+                <div class="kpi-card">
+                    <h3>% Error Crítico</h3>
+                    <p id="kpi-error-critico">0%</p>
+                </div>
+            </div>
+            <div class="grid-container">
+                <div class="chart-card">
+                    <canvas id="tendencia-semanal-chart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <canvas id="desempeno-skill-chart"></canvas>
+                </div>
+                 <div class="chart-card" style="grid-column: 1 / -1;">
+                    <canvas id="causas-raiz-chart"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- PESTAÑAS -->
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="executive-tab" data-bs-toggle="tab" data-bs-target="#executive" type="button" role="tab">Dashboard Ejecutivo</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="agents-tab" data-bs-toggle="tab" data-bs-target="#agents" type="button" role="tab">Análisis de Agentes</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="other-tab" data-bs-toggle="tab" data-bs-target="#other" type="button" role="tab">Otros Análisis</button>
-            </li>
-        </ul>
-
-        <!-- CONTENIDO DE PESTAÑAS -->
-        <div class="tab-content" id="myTabContent">
-            <!-- Dashboard Ejecutivo -->
-            <div class="tab-pane fade show active" id="executive" role="tabpanel">
-                <div class="row mt-4">
-                    <!-- KPIs -->
-                    <div class="col-md-4">
-                        <div class="card kpi-card border-primary mb-3">
-                            <div class="kpi-value" id="kpiTotalAudits">0</div>
-                            <div class="kpi-label">Total Auditorías</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card kpi-card border-success mb-3">
-                            <div class="kpi-value" id="kpiAvgScore">0.00</div>
-                            <div class="kpi-label">Nota Promedio General</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card kpi-card border-danger mb-3">
-                            <div class="kpi-value" id="kpiCriticalErrors">0.00%</div>
-                            <div class="kpi-label">% Errores Críticos</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="row mt-2">
-                    <div class="col-md-8">
-                        <div class="chart-container">
-                            <h5 class="card-title">Tendencia Semanal de Calidad</h5>
-                            <div id="weekly-trend-chart"></div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="chart-container">
-                            <h5 class="card-title">Pareto de Causas Raíz</h5>
-                            <div id="root-cause-chart"></div>
-                        </div>
-                    </div>
+        <!-- Pestaña Análisis de Agentes -->
+        <div id="tab-agentes" class="tab-content">
+            <div class="grid-container">
+                 <div class="chart-card">
+                    <canvas id="cuadrante-agentes-chart"></canvas>
                 </div>
             </div>
-
-            <!-- Análisis de Agentes -->
-            <div class="tab-pane fade" id="agents" role="tabpanel">
-                <div class="row mt-4">
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <h5 class="card-title">Cuadrante de Desempeño de Agentes</h5>
-                            <div id="agent-quadrant"></div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">Ranking de Agentes</div>
-                            <div class="card-body table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Agente</th>
-                                            <th>Nota Promedio</th>
-                                            <th>Auditorías</th>
-                                            <th>Errores Críticos</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="agent-table-body"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="table-container" style="margin-top: 20px;">
+                <h3>Ranking de Agentes</h3>
+                <table id="tabla-agentes">
+                    <thead>
+                        <tr>
+                            <th>Agente</th>
+                            <th>Supervisor</th>
+                            <th>Skill</th>
+                            <th>Nota Promedio</th>
+                            <th>Auditorías</th>
+                            <th>Errores Críticos</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
+        </div>
 
-            <!-- Otros Análisis -->
-            <div class="tab-pane fade" id="other" role="tabpanel">
-                <div class="row mt-4">
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <h5 class="card-title">Desempeño por Skill</h5>
-                            <div id="skill-performance-chart"></div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <h5 class="card-title">Desempeño por Supervisor</h5>
-                            <div id="supervisor-performance-chart"></div>
-                        </div>
-                    </div>
+        <!-- Pestaña Otros Análisis -->
+        <div id="tab-otros" class="tab-content">
+            <div class="grid-container">
+                <div class="chart-card">
+                    <canvas id="desempeno-longevidad-chart"></canvas>
                 </div>
-                 <div class="row mt-4">
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <h5 class="card-title">Desempeño por Longevidad</h5>
-                            <div id="longevity-performance-chart"></div>
-                        </div>
-                    </div>
+                <div class="chart-card">
+                    <canvas id="desempeno-supervisor-chart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Modal para Drill-Down -->
-    <div class="modal fade" id="drillDownModal" tabindex="-1">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="drillDownModalLabel">Detalle de Auditorías</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" id="drillDownModalBody">
-                    <!-- Contenido se genera dinámicamente -->
-                </div>
+    <div id="drill-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal()">&times;</span>
+            <h2 id="modal-title">Detalle de Datos</h2>
+            <div class="table-container">
+                <table id="modal-table">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+let fullData = {};
+let charts = {};
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            let fullData = {};
-            let charts = {};
-            const drillDownModal = new bootstrap.Modal(document.getElementById('drillDownModal'));
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const response = await fetch('data.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        fullData = await response.json();
+        console.log("Datos cargados:", fullData);
+        
+        populateFilters();
+        initializeDashboard();
 
-            // --- CARGA DE DATOS ---
-            fetch('data.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok ' + response.statusText);
+    } catch (error) {
+        console.error("Error al cargar data.json:", error);
+        alert("No se pudo cargar el archivo de datos 'data.json'. Por favor, asegúrese de que el archivo exista y sea accesible.");
+    }
+
+    document.getElementById('apply-filters').addEventListener('click', applyFilters);
+});
+
+function populateFilters() {
+    const { skills, supervisores, longevidad, min_fecha, max_fecha } = fullData.filtros;
+    
+    populateSelect('skill-filter', skills);
+    populateSelect('supervisor-filter', supervisores);
+    populateSelect('longevidad-filter', longevidad);
+
+    document.getElementById('fecha-desde').value = min_fecha;
+    document.getElementById('fecha-hasta').value = max_fecha;
+}
+
+function populateSelect(elementId, options) {
+    const select = document.getElementById(elementId);
+    select.innerHTML = ''; // Limpiar opciones existentes
+    options.forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option;
+        opt.textContent = option;
+        select.appendChild(opt);
+    });
+}
+
+function initializeDashboard() {
+    updateDashboard(fullData);
+}
+
+function applyFilters() {
+    const fechaDesde = document.getElementById('fecha-desde').value;
+    const fechaHasta = document.getElementById('fecha-hasta').value;
+    const skills = getSelectedOptions('skill-filter');
+    const supervisores = getSelectedOptions('supervisor-filter');
+    const longevidad = getSelectedOptions('longevidad-filter');
+
+    const filteredRawData = fullData.datos_crudos.filter(d => {
+        const fechaValida = d.Fecha >= fechaDesde && d.Fecha <= fechaHasta;
+        const skillValido = skills.length === 0 || skills.includes(d.Skill);
+        const supervisorValido = supervisores.length === 0 || supervisores.includes(d.Supervisor);
+        const longevidadValida = longevidad.length === 0 || longevidad.includes(d.Longevidad);
+        return fechaValida && skillValido && supervisorValido && longevidadValida;
+    });
+
+    const filteredAggregates = recalculateAggregates(filteredRawData);
+    updateDashboard(filteredAggregates);
+}
+
+function getSelectedOptions(elementId) {
+    return Array.from(document.getElementById(elementId).selectedOptions).map(opt => opt.value);
+}
+
+function recalculateAggregates(filteredData) {
+    // Recalcular KPIs
+    const total_auditorias = filteredData.length;
+    const nota_promedio = total_auditorias > 0 ? filteredData.reduce((sum, d) => sum + d.Nota, 0) / total_auditorias : 0;
+    const total_errores_criticos = filteredData.filter(d => d.Error_Critico === 'SI').length;
+    const porc_errores_criticos = total_auditorias > 0 ? (total_errores_criticos / total_auditorias) * 100 : 0;
+
+    const kpis = {
+        total_auditorias,
+        nota_promedio: nota_promedio.toFixed(2),
+        porc_errores_criticos: porc_errores_criticos.toFixed(2)
+    };
+
+    // Agrupar datos para gráficos
+    const groupBy = (data, key) => data.reduce((acc, item) => {
+        (acc[item[key]] = acc[item[key]] || []).push(item);
+        return acc;
+    }, {});
+
+    const calculateGroupStats = (groupedData, nameKey) => {
+        return Object.entries(groupedData).map(([key, values]) => ({
+            [nameKey]: key,
+            Nota_Promedio: values.reduce((sum, v) => sum + v.Nota, 0) / values.length,
+            Auditorias: values.length,
+            Errores_Criticos: values.filter(v => v.Error_Critico === 'SI').length
+        }));
+    };
+    
+    const df_clean_temp = filteredData.map(d => ({...d, Semana: new Date(d.Fecha).toISOString().slice(0,10)}));
+    const tendencia_semanal = calculateGroupStats(groupBy(df_clean_temp, 'Semana'), 'Semana');
+
+    return {
+        kpis,
+        tendencia_semanal,
+        desempeno_skill: calculateGroupStats(groupBy(filteredData, 'Skill'), 'Skill'),
+        desempeno_agente: calculateGroupStats(groupBy(filteredData, 'Agente'), 'Agente'),
+        desempeno_supervisor: calculateGroupStats(groupBy(filteredData, 'Supervisor'), 'Supervisor'),
+        desempeno_longevidad: calculateGroupStats(groupBy(filteredData, 'Longevidad'), 'Longevidad'),
+        causas_raiz_freq: filteredData.flatMap(d => d.Causas_Raiz).reduce((acc, causa) => {
+            acc[causa] = (acc[causa] || 0) + 1;
+            return acc;
+        }, {}),
+        datos_crudos: filteredData
+    };
+}
+
+
+function updateDashboard(data) {
+    // Actualizar KPIs
+    document.getElementById('kpi-nota-promedio').textContent = data.kpis.nota_promedio;
+    document.getElementById('kpi-total-auditorias').textContent = data.kpis.total_auditorias;
+    document.getElementById('kpi-error-critico').textContent = `${data.kpis.porc_errores_criticos}%`;
+
+    // Actualizar Gráficos
+    createOrUpdateChart('tendencia-semanal-chart', 'line', {
+        labels: data.tendencia_semanal.map(d => d.Semana),
+        datasets: [{
+            label: 'Nota Promedio Semanal',
+            data: data.tendencia_semanal.map(d => d.Nota_Promedio),
+            borderColor: 'rgba(0, 80, 158, 1)',
+            tension: 0.1
+        }]
+    }, 'Tendencia de Calidad Semanal', data.datos_crudos, 'Semana');
+
+    createOrUpdateChart('desempeno-skill-chart', 'bar', {
+        labels: data.desempeno_skill.map(d => d.Skill),
+        datasets: [{
+            label: 'Nota Promedio',
+            data: data.desempeno_skill.map(d => d.Nota_Promedio),
+            backgroundColor: 'rgba(0, 51, 102, 0.7)'
+        }]
+    }, 'Desempeño por Skill', data.datos_crudos, 'Skill');
+    
+    const causasData = Object.entries(data.causas_raiz_freq).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    createOrUpdateChart('causas-raiz-chart', 'bar', {
+        labels: causasData.map(d => d[0]),
+        datasets: [{
+            label: 'Frecuencia',
+            data: causasData.map(d => d[1]),
+            backgroundColor: 'rgba(255, 99, 132, 0.7)'
+        }]
+    }, 'Top 10 Causas Raíz de Fallas', data.datos_crudos, 'Causas_Raiz');
+
+    createOrUpdateChart('cuadrante-agentes-chart', 'scatter', {
+        datasets: [{
+            label: 'Agentes',
+            data: data.desempeno_agente.map(agente => ({
+                x: agente.Auditorias,
+                y: agente.Nota_Promedio,
+                label: agente.Agente // Custom property
+            })),
+            backgroundColor: 'rgba(0, 80, 158, 0.7)'
+        }]
+    }, 'Cuadrante de Desempeño de Agentes (Volumen vs Calidad)', data.datos_crudos, 'Agente', {
+        x: { title: { display: true, text: 'Cantidad de Auditorías' } },
+        y: { title: { display: true, text: 'Nota Promedio' } }
+    });
+
+    createOrUpdateChart('desempeno-longevidad-chart', 'bar', {
+        labels: data.desempeno_longevidad.map(d => d.Longevidad),
+        datasets: [{
+            label: 'Nota Promedio',
+            data: data.desempeno_longevidad.map(d => d.Nota_Promedio),
+            backgroundColor: 'rgba(0, 80, 158, 0.7)'
+        }]
+    }, 'Desempeño por Longevidad', data.datos_crudos, 'Longevidad');
+
+    createOrUpdateChart('desempeno-supervisor-chart', 'bar', {
+        labels: data.desempeno_supervisor.map(d => d.Supervisor),
+        datasets: [{
+            label: 'Nota Promedio',
+            data: data.desempeno_supervisor.map(d => d.Nota_Promedio),
+            backgroundColor: 'rgba(0, 51, 102, 0.7)'
+        }]
+    }, 'Desempeño por Supervisor', data.datos_crudos, 'Supervisor');
+
+    // Actualizar Tabla de Agentes
+    updateAgentTable(data.desempeno_agente, data.datos_crudos);
+}
+
+function createOrUpdateChart(canvasId, type, data, title, rawData, filterKey, customScales = {}) {
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    if (charts[canvasId]) {
+        charts[canvasId].destroy();
+    }
+    charts[canvasId] = new Chart(ctx, {
+        type: type,
+        data: data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: {
+                    display: true,
+                    text: title,
+                    font: { size: 18 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if (type === 'scatter') {
+                                return context.raw.label;
+                            }
+                            return context.dataset.label + ': ' + context.formattedValue;
+                        }
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    fullData = data;
-                    initializeApp(fullData);
-                })
-                .catch(error => {
-                    console.error('Error al cargar data.json:', error);
-                    alert('No se pudo cargar el archivo de datos (data.json). Por favor, asegúrese de que el archivo exista y sea accesible.');
-                });
-
-            // --- INICIALIZACIÓN ---
-            function initializeApp(data) {
-                populateFilters(data.datosCrudo);
-                updateDashboard(data);
-                document.getElementById('applyFilters').addEventListener('click', applyFilters);
-            }
-
-            function populateFilters(rawData) {
-                const skillFilter = document.getElementById('skillFilter');
-                const supervisorFilter = document.getElementById('supervisorFilter');
-
-                const skills = [...new Set(rawData.map(item => item.Skill))].sort();
-                const supervisors = [...new Set(rawData.map(item => item.Supervisor))].sort();
-
-                skillFilter.innerHTML = '<option value="">Todos</option>' + skills.map(s => `<option value="${s}">${s}</option>`).join('');
-                supervisorFilter.innerHTML = '<option value="">Todos</option>' + supervisors.map(s => `<option value="${s}">${s}</option>`).join('');
-            }
-
-            // --- LÓGICA DE FILTROS ---
-            function applyFilters() {
-                const filters = {
-                    fechaDesde: document.getElementById('fechaDesde').value,
-                    fechaHasta: document.getElementById('fechaHasta').value,
-                    skill: document.getElementById('skillFilter').value,
-                    supervisor: document.getElementById('supervisorFilter').value
-                };
-
-                const filteredRawData = fullData.datosCrudo.filter(item => {
-                    const itemDate = new Date(item.Fecha);
-                    const fechaDesde = filters.fechaDesde ? new Date(filters.fechaDesde) : null;
-                    const fechaHasta = filters.fechaHasta ? new Date(filters.fechaHasta) : null;
-
-                    if (fechaDesde && itemDate < fechaDesde) return false;
-                    if (fechaHasta && itemDate > fechaHasta) return false;
-                    if (filters.skill && item.Skill !== filters.skill) return false;
-                    if (filters.supervisor && item.Supervisor !== filters.supervisor) return false;
-                    
-                    return true;
-                });
-                
-                // Recalcular agregados a partir de la data cruda filtrada
-                const filteredAggregates = recalculateAggregates(filteredRawData);
-                updateDashboard(filteredAggregates);
-            }
-            
-            function recalculateAggregates(filteredRawData) {
-                // Esta es una versión simplificada. Para un dashboard complejo, 
-                // sería más eficiente recalcular todo como en el script de Python.
-                // Por simplicidad aquí, solo recalculamos los KPIs básicos.
-                const totalAuditorias = filteredRawData.length;
-                const notaPromedio = totalAuditorias > 0 ? filteredRawData.reduce((sum, item) => sum + item.Nota, 0) / totalAuditorias : 0;
-                const erroresCriticos = totalAuditorias > 0 ? (filteredRawData.filter(item => item.Error_Critico === 'SI').length / totalAuditorias) * 100 : 0;
-
-                // Para los gráficos, filtramos los datos pre-agregados para mantener la simplicidad
-                // En un escenario real, se volverían a agregar desde filteredRawData
-                const filteredAgents = [...new Set(filteredRawData.map(d => d.Agente))];
-                const filteredSkills = [...new Set(filteredRawData.map(d => d.Skill))];
-                const filteredSupervisors = [...new Set(filteredRawData.map(d => d.Supervisor))];
-
-                return {
-                    kpisGenerales: {
-                        total_auditorias: totalAuditorias,
-                        nota_promedio: notaPromedio,
-                        porc_errores_criticos: erroresCriticos
-                    },
-                    // Los datos de los gráficos se filtran, no se recalculan por completo en el front
-                    tendenciaSemanal: fullData.tendenciaSemanal, // La tendencia es más compleja de recalcular aquí
-                    paretoCausasRaiz: fullData.paretoCausasRaiz, // El pareto también
-                    desempenoAgente: fullData.desempenoAgente.filter(a => filteredAgents.includes(a.Agente)),
-                    desempenoSkill: fullData.desempenoSkill.filter(s => filteredSkills.includes(s.Skill)),
-                    desempenoSupervisor: fullData.desempenoSupervisor.filter(s => filteredSupervisors.includes(s.Supervisor)),
-                    desempenoLongevidad: fullData.desempenoLongevidad,
-                    datosCrudo: filteredRawData
-                };
-            }
-
-
-            // --- ACTUALIZACIÓN DEL DASHBOARD ---
-            function updateDashboard(data) {
-                updateKPIs(data.kpisGenerales);
-                renderWeeklyTrend(data.tendenciaSemanal, data.datosCrudo);
-                renderRootCause(data.paretoCausasRaiz, data.datosCrudo);
-                renderAgentQuadrant(data.desempenoAgente, data.datosCrudo);
-                renderAgentTable(data.desempenoAgente, data.datosCrudo);
-                renderSkillPerformance(data.desempenoSkill, data.datosCrudo);
-                renderSupervisorPerformance(data.desempenoSupervisor, data.datosCrudo);
-                renderLongevityPerformance(data.desempenoLongevidad, data.datosCrudo);
-            }
-
-            function updateKPIs(kpis) {
-                document.getElementById('kpiTotalAudits').textContent = kpis.total_auditorias.toLocaleString();
-                document.getElementById('kpiAvgScore').textContent = kpis.nota_promedio.toFixed(2);
-                document.getElementById('kpiCriticalErrors').textContent = kpis.porc_errores_criticos.toFixed(2) + '%';
-            }
-
-            // --- FUNCIONES DE RENDERIZADO DE GRÁFICOS ---
-            function renderChart(containerId, options) {
-                if (charts[containerId]) {
-                    charts[containerId].destroy();
                 }
-                const chart = new ApexCharts(document.getElementById(containerId), options);
-                charts[containerId] = chart;
-                chart.render();
-            }
-
-            function renderWeeklyTrend(trendData, rawData) {
-                const options = {
-                    series: [{
-                        name: 'Nota Promedio',
-                        type: 'line',
-                        data: trendData.map(d => d.Nota_Promedio)
-                    }, {
-                        name: 'Volumen',
-                        type: 'column',
-                        data: trendData.map(d => d.Volumen)
-                    }],
-                    chart: {
-                        height: 350,
-                        type: 'line',
-                        events: {
-                            dataPointSelection: (event, chartContext, config) => {
-                                const week = trendData[config.dataPointIndex].Fecha;
-                                showDrillDownModalForWeek(week, rawData);
-                            }
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const elementIndex = elements[0].index;
+                    const clickedLabel = data.labels[elementIndex];
+                    const filtered = rawData.filter(d => {
+                        if (Array.isArray(d[filterKey])) {
+                            return d[filterKey].includes(clickedLabel);
                         }
-                    },
-                    stroke: { width: [4, 0] },
-                    title: { text: 'Nota Promedio vs Volumen de Auditorías' },
-                    xaxis: { categories: trendData.map(d => d.Fecha) },
-                    yaxis: [{
-                        title: { text: 'Nota Promedio' },
-                    }, {
-                        opposite: true,
-                        title: { text: 'Volumen' }
-                    }]
-                };
-                renderChart('weekly-trend-chart', options);
-            }
-            
-            function renderRootCause(causeData, rawData) {
-                const options = {
-                    series: [{
-                        data: causeData.map(d => d.Frecuencia)
-                    }],
-                    chart: {
-                        type: 'bar',
-                        height: 350,
-                         events: {
-                            dataPointSelection: (event, chartContext, config) => {
-                                const cause = causeData[config.dataPointIndex].Causa;
-                                showDrillDownModalForCause(cause, rawData);
-                            }
-                        }
-                    },
-                    plotOptions: { bar: { borderRadius: 4, horizontal: true } },
-                    dataLabels: { enabled: false },
-                    xaxis: { categories: causeData.map(d => d.Causa) }
-                };
-                renderChart('root-cause-chart', options);
-            }
-
-            function renderAgentQuadrant(agentData, rawData) {
-                const avgScore = agentData.reduce((sum, agent) => sum + agent.Nota_Promedio, 0) / agentData.length;
-                const avgAudits = agentData.reduce((sum, agent) => sum + agent.Auditorias, 0) / agentData.length;
-
-                const options = {
-                    series: [{
-                        name: 'Agentes',
-                        data: agentData.map(agent => ({
-                            x: agent.Auditorias,
-                            y: agent.Nota_Promedio,
-                            name: agent.Agente
-                        }))
-                    }],
-                    chart: {
-                        height: 350,
-                        type: 'scatter',
-                        zoom: { enabled: true, type: 'xy' },
-                        events: {
-                            dataPointSelection: (event, chartContext, config) => {
-                                const agentName = agentData[config.dataPointIndex].Agente;
-                                showDrillDownModalForAgent(agentName, rawData);
-                            }
-                        }
-                    },
-                    xaxis: {
-                        tickAmount: 10,
-                        title: { text: 'Volumen de Auditorías' }
-                    },
-                    yaxis: {
-                        tickAmount: 7,
-                        title: { text: 'Nota Promedio' }
-                    },
-                    annotations: {
-                        yaxis: [{
-                            y: avgScore,
-                            borderColor: '#dc3545',
-                            label: {
-                                borderColor: '#dc3545',
-                                style: { color: '#fff', background: '#dc3545' },
-                                text: 'Promedio Nota'
-                            }
-                        }],
-                        xaxis: [{
-                            x: avgAudits,
-                            borderColor: '#0d6efd',
-                            label: {
-                                borderColor: '#0d6efd',
-                                style: { color: '#fff', background: '#0d6efd' },
-                                text: 'Promedio Auditorías'
-                            }
-                        }]
-                    },
-                    tooltip: {
-                        x: { formatter: (val) => `${val} Auditorías` },
-                        y: { formatter: (val) => `Nota: ${val.toFixed(2)}` },
-                        z: { title: 'Agente: ' }
-                    }
-                };
-                renderChart('agent-quadrant', options);
-            }
-
-            function renderAgentTable(agentData, rawData) {
-                const tableBody = document.getElementById('agent-table-body');
-                agentData.sort((a, b) => b.Nota_Promedio - a.Nota_Promedio);
-                tableBody.innerHTML = agentData.map(agent => `
-                    <tr data-agent-name="${agent.Agente}">
-                        <td>${agent.Agente}</td>
-                        <td>${agent.Nota_Promedio.toFixed(2)}</td>
-                        <td>${agent.Auditorias}</td>
-                        <td>${agent.Errores_Criticos}</td>
-                    </tr>
-                `).join('');
-
-                tableBody.querySelectorAll('tr').forEach(row => {
-                    row.addEventListener('dblclick', () => {
-                        const agentName = row.dataset.agentName;
-                        showAgentDetailModal(agentName, agentData, rawData);
+                        return d[filterKey] == clickedLabel
                     });
-                });
-            }
-            
-            function renderGenericBarChart(containerId, data, xField, yField, title, rawData, drillDownKey) {
-                 data.sort((a, b) => b[yField] - a[yField]);
-                 const options = {
-                    series: [{ name: 'Nota Promedio', data: data.map(d => d[yField]) }],
-                    chart: { 
-                        type: 'bar', 
-                        height: 350,
-                        events: {
-                            dataPointSelection: (event, chartContext, config) => {
-                                const value = data[config.dataPointIndex][xField];
-                                showDrillDownModalForGeneric(drillDownKey, value, rawData);
-                            }
-                        }
-                    },
-                    plotOptions: { bar: { horizontal: false } },
-                    dataLabels: { enabled: false },
-                    xaxis: { categories: data.map(d => d[xField]) },
-                    title: { text: title }
-                };
-                renderChart(containerId, options);
-            }
-
-            function renderSkillPerformance(skillData, rawData) {
-                renderGenericBarChart('skill-performance-chart', skillData, 'Skill', 'Nota_Promedio', 'Nota Promedio por Skill', rawData, 'Skill');
-            }
-
-            function renderSupervisorPerformance(supervisorData, rawData) {
-                renderGenericBarChart('supervisor-performance-chart', supervisorData, 'Supervisor', 'Nota_Promedio', 'Nota Promedio por Supervisor', rawData, 'Supervisor');
-            }
-            
-            function renderLongevityPerformance(longevityData, rawData) {
-                renderGenericBarChart('longevity-performance-chart', longevityData, 'Longevidad', 'Nota_Promedio', 'Nota Promedio por Longevidad', rawData, 'Longevidad');
-            }
-
-            // --- LÓGICA DE MODALES (DRILL-DOWN) ---
-            function showDrillDownModal(title, filteredData) {
-                document.getElementById('drillDownModalLabel').textContent = title;
-                const modalBody = document.getElementById('drillDownModalBody');
-                
-                if (!filteredData || filteredData.length === 0) {
-                    modalBody.innerHTML = '<p>No hay datos para mostrar.</p>';
-                    drillDownModal.show();
-                    return;
+                    showModalWithData(clickedLabel, filtered);
                 }
+            },
+            scales: customScales
+        }
+    });
+}
 
-                const headers = ['Fecha', 'Agente', 'Supervisor', 'Skill', 'Nota', 'Error_Critico', 'Auditor', 'Comentarios'];
-                let table = '<div class="table-responsive"><table class="table table-sm">';
-                table += '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
-                table += '<tbody>';
-                filteredData.forEach(row => {
-                    table += '<tr>';
-                    headers.forEach(header => {
-                        table += `<td>${row[header] || ''}</td>`;
-                    });
-                    table += '</tr>';
-                });
-                table += '</tbody></table></div>';
-                modalBody.innerHTML = table;
-                drillDownModal.show();
-            }
-            
-            function showDrillDownModalForAgent(agentName, rawData) {
-                const agentAudits = rawData.filter(d => d.Agente === agentName);
-                showDrillDownModal(`Detalle de Auditorías para: ${agentName}`, agentAudits);
-            }
-
-            function showDrillDownModalForWeek(weekStartDate, rawData) {
-                const start = new Date(weekStartDate);
-                const end = new Date(start);
-                end.setDate(start.getDate() + 7);
-                const weekAudits = rawData.filter(d => {
-                    const auditDate = new Date(d.Fecha);
-                    return auditDate >= start && auditDate < end;
-                });
-                showDrillDownModal(`Detalle de Auditorías para la semana del ${weekStartDate}`, weekAudits);
-            }
-            
-            function showDrillDownModalForCause(cause, rawData) {
-                const causeAudits = rawData.filter(d => d.Causas_Raiz && d.Causas_Raiz.includes(cause));
-                showDrillDownModal(`Auditorías con Causa Raíz: ${cause}`, causeAudits);
-            }
-            
-            function showDrillDownModalForGeneric(key, value, rawData) {
-                const filteredAudits = rawData.filter(d => d[key] === value);
-                showDrillDownModal(`Auditorías para ${key}: ${value}`, filteredAudits);
-            }
-
-            function showAgentDetailModal(agentName, agentData, rawData) {
-                const agentSummary = agentData.find(a => a.Agente === agentName);
-                const agentAudits = rawData.filter(d => d.Agente === agentName);
-
-                document.getElementById('drillDownModalLabel').textContent = `Ficha de Calidad: ${agentName}`;
-                const modalBody = document.getElementById('drillDownModalBody');
-
-                let content = `<h4>Resumen de Desempeño</h4>`;
-                content += `<div class="row">
-                    <div class="col-md-4"><strong>Nota Promedio:</strong> ${agentSummary.Nota_Promedio.toFixed(2)}</div>
-                    <div class="col-md-4"><strong>Total Auditorías:</strong> ${agentSummary.Auditorias}</div>
-                    <div class="col-md-4"><strong>Errores Críticos:</strong> ${agentSummary.Errores_Criticos}</div>
-                </div><hr>`;
-                
-                content += `<h4>Historial de Auditorías</h4>`;
-                
-                const headers = ['Fecha', 'Nota', 'Error_Critico', 'Auditor', 'Comentarios'];
-                content += '<div class="table-responsive"><table class="table table-sm">';
-                content += '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
-                content += '<tbody>';
-                agentAudits.forEach(row => {
-                    content += '<tr>';
-                    headers.forEach(header => {
-                        content += `<td>${row[header] || ''}</td>`;
-                    });
-                    content += '</tr>';
-                });
-                content += '</tbody></table></div>';
-
-                modalBody.innerHTML = content;
-                drillDownModal.show();
-            }
+function updateAgentTable(agentes, rawData) {
+    const tableBody = document.getElementById('tabla-agentes').querySelector('tbody');
+    tableBody.innerHTML = '';
+    agentes.sort((a, b) => b.Nota_Promedio - a.Nota_Promedio);
+    agentes.forEach(agente => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${agente.Agente}</td>
+            <td>${agente.Supervisor || 'N/A'}</td>
+            <td>${agente.Skill || 'N/A'}</td>
+            <td>${agente.Nota_Promedio.toFixed(2)}</td>
+            <td>${agente.Auditorias}</td>
+            <td>${agente.Errores_Criticos}</td>
+        `;
+        row.addEventListener('dblclick', () => {
+            const agentData = rawData.filter(d => d.Agente === agente.Agente);
+            showModalWithData(`Ficha de Calidad: ${agente.Agente}`, agentData);
         });
-    </script>
+        tableBody.appendChild(row);
+    });
+}
+
+function showModalWithData(title, data) {
+    const modal = document.getElementById('drill-modal');
+    document.getElementById('modal-title').textContent = title;
+    
+    const tableHead = modal.querySelector('thead');
+    const tableBody = modal.querySelector('tbody');
+    tableHead.innerHTML = '';
+    tableBody.innerHTML = '';
+
+    if (data.length > 0) {
+        const headers = Object.keys(data[0]);
+        const headerRow = document.createElement('tr');
+        headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header;
+            headerRow.appendChild(th);
+        });
+        tableHead.appendChild(headerRow);
+
+        data.forEach(item => {
+            const row = document.createElement('tr');
+            headers.forEach(header => {
+                const td = document.createElement('td');
+                let value = item[header];
+                if (Array.isArray(value)) {
+                    value = value.join(', ');
+                } else if (typeof value === 'number') {
+                    value = value.toFixed(2);
+                }
+                td.textContent = value;
+                row.appendChild(td);
+            });
+            tableBody.appendChild(row);
+        });
+    }
+
+    modal.style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('drill-modal').style.display = 'none';
+}
+
+function openTab(evt, tabName) {
+    let i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tab-button");
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+}
+
+</script>
+
 </body>
 </html>
