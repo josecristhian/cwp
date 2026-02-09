@@ -90,20 +90,21 @@
         let charts = {};
         let currentFilteredData = [];
 
-        // --- MAIN INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
             fetch('data.json')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) { throw new Error("Network response was not ok"); }
+                    return response.json();
+                })
                 .then(data => {
                     fullData = data;
-                    // Convert date strings to Date objects for filtering
                     fullData.raw_data.forEach(d => d.Fecha = new Date(d.Fecha));
                     populateFilters();
-                    applyFilters(); // Initial load
+                    applyFilters();
                 })
                 .catch(error => {
                     console.error("Error loading data.json:", error);
-                    alert("No se pudo cargar el archivo de datos 'data.json'. Asegúrese de que el archivo existe en el mismo directorio.");
+                    alert("No se pudo cargar el archivo de datos 'data.json'. Asegúrese de que el archivo existe en el mismo directorio que este HTML.");
                 });
         });
 
@@ -179,8 +180,8 @@
         function renderSkillBubbleChart(data) {
             const skillData = [...new Set(data.map(d => d.Skill))].map(skill => {
                 const skillAudits = data.filter(d => d.Skill === skill);
-                const notaPromedio = skillAudits.reduce((sum, d) => sum + d.Nota, 0) / skillAudits.length;
-                const tasaErrorCritico = (skillAudits.filter(d => d.Error_Critico === 'SI').length / skillAudits.length) * 100;
+                const notaPromedio = skillAudits.reduce((sum, d) => sum + d.Nota, 0) / skillAudits.length || 0;
+                const tasaErrorCritico = (skillAudits.filter(d => d.Error_Critico === 'SI').length / skillAudits.length) * 100 || 0;
                 return { label: skill, x: notaPromedio, y: tasaErrorCritico, r: Math.sqrt(skillAudits.length) * 2 };
             });
 
@@ -204,11 +205,7 @@
         function renderLongevityChart(data) {
             const longevityData = [...new Set(data.map(d => d.Longevidad))].map(l => {
                 const audits = data.filter(d => d.Longevidad === l);
-                return {
-                    longevidad: l,
-                    nota_promedio: audits.reduce((sum, d) => sum + d.Nota, 0) / audits.length,
-                    tasa_error_critico: (audits.filter(d => d.Error_Critico === 'SI').length / audits.length) * 100
-                };
+                return { longevidad: l, nota_promedio: audits.reduce((sum, d) => sum + d.Nota, 0) / audits.length || 0 };
             });
             charts.longevity = new Chart('longevityChart', {
                 type: 'bar',
@@ -220,7 +217,7 @@
         function renderSupervisorChart(data) {
             const supervisorData = [...new Set(data.map(d => d.Supervisor))].map(s => {
                 const audits = data.filter(d => d.Supervisor === s);
-                return { supervisor: s, nota_promedio: audits.reduce((sum, d) => sum + d.Nota, 0) / audits.length };
+                return { supervisor: s, nota_promedio: audits.reduce((sum, d) => sum + d.Nota, 0) / audits.length || 0 };
             }).sort((a,b) => b.nota_promedio - a.nota_promedio);
 
             charts.supervisor = new Chart('supervisorChart', {
